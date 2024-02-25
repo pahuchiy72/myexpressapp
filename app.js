@@ -8,7 +8,7 @@ const port = 3000;
 
 app.use(express.json());
 
-app.use((reg, res, next) => {
+app.use((_reg, _res, next) => {
   console.log("А все таки як працювати в hoppscotch.io ");
   next();
 });
