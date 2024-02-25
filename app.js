@@ -1,5 +1,6 @@
 const express = require("express");
 const { PrismaClient } = require("@prisma/client");
+const Joi = require("joi");
 // const sqlite3 = require("sqlite3");
 
 const prisma = new PrismaClient();
@@ -7,6 +8,16 @@ const app = express();
 const port = 3000;
 
 app.use(express.json());
+
+app.use((reg, res, next) => {
+  console.log("А все таки як працювати в hoppscotch.io ");
+  next();
+});
+
+const userSchema = Joi.object({
+  name: Joi.string().min(3).max(30).required(),
+  email: Joi.string().email().required(),
+});
 // const db = new sqlite3.Database(":memory:");
 
 // db.serialize(() => {
@@ -15,7 +26,7 @@ app.use(express.json());
 //   );
 // });
 
-let users = {};
+// let users = {};
 
 app.get("/users", async (_req, res) => {
   try {
@@ -57,7 +68,13 @@ app.get("/users/:id", async (_reg, res) => {
 });
 
 app.post("/users", async (req, res) => {
-  const { name, email } = req.body;
+  const userData = req.body;
+  const { value, error } = userSchema.validate(userData);
+  if (error) {
+    return res.status(400).json(`Error: ${error.message}`);
+  }
+  const { name, email } = value;
+  // const { name, email } = req.body;
   try {
     const user = await prisma.user.create({
       data: { name, email },
