@@ -18,9 +18,15 @@ const userSchema = Joi.object({
   email: Joi.string().email().required(),
 });
 app.get("/users", async (_req, res) => {
+  const page = parseInt(_req.query.page) || 1;
+  const limit = parseInt(_req.query.limit) || 3;
+  const startIndex = (page - 1) * limit;
+  const endIndex = page * limit;
+
   try {
     const users = await prisma.user.findMany();
-    res.json(users);
+    const usersSlice = users.slice(startIndex, endIndex);
+    res.json(usersSlice);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
