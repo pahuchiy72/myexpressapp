@@ -1,99 +1,61 @@
 const express = require("express");
-const { PrismaClient } = require("@prisma/client");
-const Joi = require("joi");
+// const { PrismaClient } = require("@prisma/client");
+// const Joi = require("joi");
 
-const prisma = new PrismaClient();
 const app = express();
 const port = 3000;
 
 app.use(express.json());
 
-app.use((_reg, _res, next) => {
-  console.log("А все таки як працювати в hoppscotch.io ");
-  next();
+let users = {};
+
+app.get("/users", (_req, res) => {
+  res.status(200).json({ users });
 });
 
-const userSchema = Joi.object({
-  name: Joi.string().min(3).max(30).required(),
-  email: Joi.string().email().required(),
-});
-app.get("/users", async (_req, res) => {
-  const page = parseInt(_req.query.page) || 1;
-  const limit = parseInt(_req.query.limit) || 3;
-  const startIndex = (page - 1) * limit;
-  const endIndex = page * limit;
-
-  try {
-    const users = await prisma.user.findMany();
-    const usersSlice = users.slice(startIndex, endIndex);
-    res.json(usersSlice);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-app.get("/users/:id", async (_reg, res) => {
+app.get("/users/:id", (req, res) => {
   const { id } = req.params;
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: parseInt(id) },
-    });
-    if (user) {
-      res.json(user);
-    } else {
-      res.status(404).json({ message: "User not found" });
-    }
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+  const user = users[id];
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
   }
+  res.status(200).json({ user: users[id] });
 });
 
-app.post("/users", async (req, res) => {
-  const userData = req.body;
-  const { value, error } = userSchema.validate(userData);
-  if (error) {
-    return res.status(400).json(`Error: ${error.message}`);
-  }
-  const { name, email } = value;
+app.post("/users", (req, res) => {
+  const { id, name, email } = req.body;
 
-  try {
-    const user = await prisma.user.create({
-      data: { name, email },
-    });
-    res.status(201).json(user);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+  if (users[id]) {
+    res.status(409).json({ error: "User already exists" });
+    return;
   }
+  users[id] = { name, email };
+  res.status(201).json({ user: users[id] });
 });
 
-app.put("/users/:id", async (req, res) => {
+app.put("/users/:id", (req, res) => {
   const { id } = req.params;
   const { name, email } = req.body;
-
-  try {
-    const user = await prisma.user.update({
-      where: { id: parseInt(id) },
-      data: { name, email },
-    });
-    res.json(user);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+  const user = users[id];
+  if (!user) {
+    res.status(404).json({error: "User not found"  });
+    return;
   }
+  users[id] = { name, email };
+  res.status(200).json({ user: users[id] });
 });
 
-app.delete("/users/:id", async (req, res) => {
+app.delete("/users/:id", (req, res) => {
   const { id } = req.params;
-
-  try {
-    const user = await prisma.user.delete({
-      where: { id: parseInt(id) },
-    });
-    res.json({ message: "User deleted" });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+  const user = users[id];
+  if (!user) {
+    res.status(404).json({error: "User not found"  });
+    return;
   }
+  delete users[id];
+  res.status(200).json({ message: "User deleted successfully" });
 });
-
 app.listen(port, () => {
   console.log(`Відповідь з сервера на порт http://localhost:${port}`);
 });
