@@ -94,6 +94,10 @@ app.delete("/users/:id", async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`Відповідь з сервера на порт http://localhost:${port}`);
-});
+if (require.main === module) {
+  app.listen(port, () => {
+    console.log(`Відповідь з сервера на порт http://localhost:${port}`);
+  });
+}
+
+module.exports = app;
