@@ -2,7 +2,8 @@ const express = require("express");
 const { PrismaClient } = require("@prisma/client");
 const Joi = require("joi");
 const bcrypt = require("bcrypt");
-const session = require("express-session");
+// const session = require("express-session");
+const { authenticateToken, generateToken } = require("./security");
 
 const prisma = new PrismaClient();
 const app = express();
@@ -15,13 +16,13 @@ app.use((_req, _res, next) => {
   next();
 });
 
-app.use(
-  session({
-    secret: "your_secretkey_here",
-    resave: false,
-    saveUninitialized: true,
-  })
-);
+// app.use(
+//   session({
+//     secret: "your_secretkey_here",
+//     resave: false,
+//     saveUninitialized: true,
+//   })
+// );
 
 const userSchema = Joi.object({
   name: Joi.string().min(3).max(30).required(),
@@ -130,55 +131,57 @@ app.post("/login", async (req, res) => {
     if (!isValid) {
       return res.status(401).send("Invalid password");
     }
-    req.session.username = user.name;
-    req.session.userId = user.id;
-    res.status(200).send("Вхід успішний");
+
+    token = generateToken(user);
+    // req.session.username = user.name;
+    // req.session.userId = user.id;
+    res.status(200).send({ message: "Вхід успішний", token: token });
   } catch (err) {
     res.status(500).send("Невдача");
     console.log(err);
   }
 });
 
-// app.post("/change-password", async (req, res) => {
-//   const { email, password, changePassword } = req.body;
-
-//   try {
-//     let user = await prisma.user.findUnique({
-//       where: {
-//         email: email,
-//       },
-//     });
-//     if (!user) {
-//       return res.status(401).send("Користувачів не знайдено");
-//     }
-//     const isValid = await bcrypt.compare(password, user.hashedPassword);
-
-//     if (!isValid) {
-//       return res.status(401).send("Недійсний пароль");
-//     }
-//     const salt = await bcrypt.genSalt(10);
-//     const hashedPassword = await bcrypt.hash(changePassword, salt);
-
-//     user = await prisma.user.update({
-//       where: {
-//         email: email,
-//       },
-//       data: {
-//         hashedPassword,
-//       },
-//     });
-//     res.status(200).send("Пароль оновлено");
-//   } catch (err) {
-//     res.status(500).send("Виникла ​​помилка при оновленні пароля");
-//     console.log(err);
-//   }
-// });
-
-app.get("/profile", async (req, res) => {
-  if (req.session.username) {
-    res.send(`Привіт, ${req.session.username}`);
+app.get("/profile", authenticateToken, async (req, res) => {
+  if (req.user) {
+    res.send(`Привіт, ${req.user.username}`);
   } else {
     res.send("Де твій логін");
+  }
+});
+
+app.post("/change-password", async (req, res) => {
+  const { email, password, changePassword } = req.body;
+
+  try {
+    let user = await prisma.user.findUnique({
+      where: {
+        email: email,
+      },
+    });
+    if (!user) {
+      return res.status(401).send("Користувачів не знайдено");
+    }
+    const isValid = await bcrypt.compare(password, user.hashedPassword);
+
+    if (!isValid) {
+      return res.status(401).send("Недійсний пароль");
+    }
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(changePassword, salt);
+
+    user = await prisma.user.update({
+      where: {
+        email: email,
+      },
+      data: {
+        hashedPassword,
+      },
+    });
+    res.status(200).send("Пароль оновлено");
+  } catch (err) {
+    res.status(500).send("Виникла ​​помилка при оновленні пароля");
+    console.log(err);
   }
 });
 
