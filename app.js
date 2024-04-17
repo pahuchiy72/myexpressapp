@@ -2,6 +2,7 @@ const express = require("express");
 const { PrismaClient } = require("@prisma/client");
 const Joi = require("joi");
 const bcrypt = require("bcrypt");
+const session = require("express-session");
 
 const prisma = new PrismaClient();
 const app = express();
@@ -14,13 +15,21 @@ app.use((_req, _res, next) => {
   next();
 });
 
+app.use(
+  session({
+    secret: "your_secretkey_here",
+    resave: false,
+    saveUninitialized: true,
+  })
+);
+
 const userSchema = Joi.object({
   name: Joi.string().min(3).max(30).required(),
   email: Joi.string().email().required(),
 });
 
-app.get('/status', (reg, res) => {
-  res.status(200).send('Сервер працює');
+app.get("/status", (reg, res) => {
+  res.status(200).send("Сервер працює");
 });
 
 app.get("/users", async (_req, res) => {
@@ -82,37 +91,36 @@ app.delete("/users/:id", async (req, res) => {
   }
 });
 
-app.post('/register', async(req, res) => {
+app.post("/register", async (req, res) => {
   const { name, password, email } = req.body;
 
   try {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
-    
+
     const user = await prisma.user.create({
       data: {
-       name,
+        name,
         hashedPassword,
-         email,
+        email,
       },
     });
-    
-    res.status(200).send('Користувач зареєстровано успішно');
+
+    res.status(200).send("Користувач зареєстровано успішно");
   } catch (err) {
-    res.status(500).send('Помилка під час реєстрації користувача');
+    res.status(500).send("Помилка під час реєстрації користувача");
     console.log(err);
   }
-  
 });
 
-app.post('/login', async (req, res) => {
+app.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
   try {
     const user = await prisma.user.findUnique({
       where: {
-        email: email
-      }
+        email: email,
+      },
     });
     if (!user) {
       return res.status(401).send("No user found");
@@ -122,13 +130,56 @@ app.post('/login', async (req, res) => {
     if (!isValid) {
       return res.status(401).send("Invalid password");
     }
-
-    res.status(200).send("Login successful")
+    req.session.username = user.name;
+    req.session.userId = user.id;
+    res.status(200).send("Вхід успішний");
   } catch (err) {
-    res.status(500).send("Login error");
+    res.status(500).send("Невдача");
     console.log(err);
   }
+});
 
+// app.post("/change-password", async (req, res) => {
+//   const { email, password, changePassword } = req.body;
+
+//   try {
+//     let user = await prisma.user.findUnique({
+//       where: {
+//         email: email,
+//       },
+//     });
+//     if (!user) {
+//       return res.status(401).send("Користувачів не знайдено");
+//     }
+//     const isValid = await bcrypt.compare(password, user.hashedPassword);
+
+//     if (!isValid) {
+//       return res.status(401).send("Недійсний пароль");
+//     }
+//     const salt = await bcrypt.genSalt(10);
+//     const hashedPassword = await bcrypt.hash(changePassword, salt);
+
+//     user = await prisma.user.update({
+//       where: {
+//         email: email,
+//       },
+//       data: {
+//         hashedPassword,
+//       },
+//     });
+//     res.status(200).send("Пароль оновлено");
+//   } catch (err) {
+//     res.status(500).send("Виникла ​​помилка при оновленні пароля");
+//     console.log(err);
+//   }
+// });
+
+app.get("/profile", async (req, res) => {
+  if (req.session.username) {
+    res.send(`Привіт, ${req.session.username}`);
+  } else {
+    res.send("Де твій логін");
+  }
 });
 
 if (require.main === module) {
